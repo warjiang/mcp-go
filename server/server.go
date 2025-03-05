@@ -163,9 +163,13 @@ type toolCapabilities struct {
 // WithResourceCapabilities configures resource-related server capabilities
 func WithResourceCapabilities(subscribe, listChanged bool) ServerOption {
 	return func(s *MCPServer) {
-		s.capabilities.resources = &resourceCapabilities{
-			subscribe:   subscribe,
-			listChanged: listChanged,
+		if !subscribe && !listChanged {
+			s.capabilities.resources = nil
+		} else {
+			s.capabilities.resources = &resourceCapabilities{
+				subscribe:   subscribe,
+				listChanged: listChanged,
+			}
 		}
 	}
 }
@@ -173,8 +177,12 @@ func WithResourceCapabilities(subscribe, listChanged bool) ServerOption {
 // WithPromptCapabilities configures prompt-related server capabilities
 func WithPromptCapabilities(listChanged bool) ServerOption {
 	return func(s *MCPServer) {
-		s.capabilities.prompts = &promptCapabilities{
-			listChanged: listChanged,
+		if !listChanged {
+			s.capabilities.prompts = nil
+		} else {
+			s.capabilities.prompts = &promptCapabilities{
+				listChanged: listChanged,
+			}
 		}
 	}
 }
@@ -182,8 +190,12 @@ func WithPromptCapabilities(listChanged bool) ServerOption {
 // WithToolCapabilities configures tool-related server capabilities
 func WithToolCapabilities(listChanged bool) ServerOption {
 	return func(s *MCPServer) {
-		s.capabilities.tools = &toolCapabilities{
-			listChanged: listChanged,
+		if !listChanged {
+			s.capabilities.tools = nil
+		} else {
+			s.capabilities.tools = &toolCapabilities{
+				listChanged: listChanged,
+			}
 		}
 	}
 }
@@ -376,7 +388,7 @@ func (s *MCPServer) HandleMessage(
 		}
 		return s.handleGetPrompt(ctx, baseMessage.ID, request)
 	case "tools/list":
-		if len(s.tools) == 0 {
+		if s.capabilities.tools == nil {
 			return createErrorResponse(
 				baseMessage.ID,
 				mcp.METHOD_NOT_FOUND,
@@ -528,24 +540,33 @@ func (s *MCPServer) handleInitialize(
 ) mcp.JSONRPCMessage {
 	capabilities := mcp.ServerCapabilities{}
 
-	capabilities.Resources = &struct {
-		Subscribe   bool `json:"subscribe,omitempty"`
-		ListChanged bool `json:"listChanged,omitempty"`
-	}{
-		Subscribe:   s.capabilities.resources.subscribe,
-		ListChanged: s.capabilities.resources.listChanged,
+	// Only add resource capabilities if they're configured
+	if s.capabilities.resources != nil {
+		capabilities.Resources = &struct {
+			Subscribe   bool `json:"subscribe,omitempty"`
+			ListChanged bool `json:"listChanged,omitempty"`
+		}{
+			Subscribe:   s.capabilities.resources.subscribe,
+			ListChanged: s.capabilities.resources.listChanged,
+		}
 	}
 
-	capabilities.Prompts = &struct {
-		ListChanged bool `json:"listChanged,omitempty"`
-	}{
-		ListChanged: s.capabilities.prompts.listChanged,
+	// Only add prompt capabilities if they're configured
+	if s.capabilities.prompts != nil {
+		capabilities.Prompts = &struct {
+			ListChanged bool `json:"listChanged,omitempty"`
+		}{
+			ListChanged: s.capabilities.prompts.listChanged,
+		}
 	}
 
-	capabilities.Tools = &struct {
-		ListChanged bool `json:"listChanged,omitempty"`
-	}{
-		ListChanged: s.capabilities.tools.listChanged,
+	// Only add tool capabilities if they're configured
+	if s.capabilities.tools != nil {
+		capabilities.Tools = &struct {
+			ListChanged bool `json:"listChanged,omitempty"`
+		}{
+			ListChanged: s.capabilities.tools.listChanged,
+		}
 	}
 
 	if s.capabilities.logging {
