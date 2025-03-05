@@ -211,9 +211,9 @@ func NewMCPServer(
 		notificationHandlers: make(map[string]NotificationHandlerFunc),
 		notifications:        make(chan ServerNotification, 100),
 		capabilities: serverCapabilities{
-			tools:     &toolCapabilities{},
-			resources: &resourceCapabilities{},
-			prompts:   &promptCapabilities{},
+			tools:     nil,
+			resources: nil,
+			prompts:   nil,
 			logging:   false,
 		},
 	}
@@ -325,7 +325,7 @@ func (s *MCPServer) HandleMessage(
 		}
 		return s.handleListResourceTemplates(ctx, baseMessage.ID, request)
 	case "resources/read":
-		if !s.capabilities.resources.listChanged {
+		if s.capabilities.resources == nil {
 			return createErrorResponse(
 				baseMessage.ID,
 				mcp.METHOD_NOT_FOUND,
@@ -359,7 +359,7 @@ func (s *MCPServer) HandleMessage(
 		}
 		return s.handleListPrompts(ctx, baseMessage.ID, request)
 	case "prompts/get":
-		if !s.capabilities.prompts.listChanged {
+		if s.capabilities.prompts == nil {
 			return createErrorResponse(
 				baseMessage.ID,
 				mcp.METHOD_NOT_FOUND,
@@ -393,7 +393,7 @@ func (s *MCPServer) HandleMessage(
 		}
 		return s.handleListTools(ctx, baseMessage.ID, request)
 	case "tools/call":
-		if !s.capabilities.tools.listChanged || len(s.tools) == 0 {
+		if s.capabilities.tools == nil {
 			return createErrorResponse(
 				baseMessage.ID,
 				mcp.METHOD_NOT_FOUND,
@@ -424,7 +424,7 @@ func (s *MCPServer) AddResource(
 	handler ResourceHandlerFunc,
 ) {
 	if s.capabilities.resources == nil {
-		panic("Resource capabilities not enabled")
+		s.capabilities.resources = &resourceCapabilities{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -440,7 +440,7 @@ func (s *MCPServer) AddResourceTemplate(
 	handler ResourceTemplateHandlerFunc,
 ) {
 	if s.capabilities.resources == nil {
-		panic("Resource capabilities not enabled")
+		s.capabilities.resources = &resourceCapabilities{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -453,7 +453,7 @@ func (s *MCPServer) AddResourceTemplate(
 // AddPrompt registers a new prompt handler with the given name
 func (s *MCPServer) AddPrompt(prompt mcp.Prompt, handler PromptHandlerFunc) {
 	if s.capabilities.prompts == nil {
-		panic("Prompt capabilities not enabled")
+		s.capabilities.prompts = &promptCapabilities{}
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -468,6 +468,9 @@ func (s *MCPServer) AddTool(tool mcp.Tool, handler ToolHandlerFunc) {
 
 // AddTools registers multiple tools at once
 func (s *MCPServer) AddTools(tools ...ServerTool) {
+	if s.capabilities.tools == nil {
+		s.capabilities.tools = &toolCapabilities{}
+	}
 	s.mu.Lock()
 	for _, entry := range tools {
 		s.tools[entry.Tool.Name] = entry
